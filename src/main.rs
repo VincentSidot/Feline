@@ -11,7 +11,7 @@ use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
-    window::{WindowAttributes, WindowId},
+    window::{Fullscreen, WindowAttributes, WindowId},
 };
 
 /* Local */
@@ -56,7 +56,8 @@ impl ApplicationHandler for WinitApplication {
         let attr = WindowAttributes::default()
             .with_title(APP_NAME)
             .with_transparent(true)
-            .with_decorations(false);
+            .with_decorations(false)
+            .with_fullscreen(Some(Fullscreen::Borderless(None)));
 
         let window = Arc::new(_try!(self, event_loop.create_window(attr)));
 

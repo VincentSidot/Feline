@@ -4,11 +4,12 @@ use egui_wgpu::ScreenDescriptor;
 use egui_winit::EventResponse;
 use std::sync::Arc;
 use wgpu::{
-    Backends, CommandEncoder, CommandEncoderDescriptor, CurrentSurfaceTexture, Device,
-    DeviceDescriptor, ExperimentalFeatures, Features, Instance, InstanceDescriptor, Limits, LoadOp,
-    Operations, PowerPreference, Queue, RenderPassColorAttachment, RenderPassDescriptor,
-    RequestAdapterOptions, StoreOp, Surface, SurfaceConfiguration, TextureUsages, TextureView,
-    TextureViewDescriptor, Trace,
+    BackendOptions, Backends, CommandEncoder, CommandEncoderDescriptor, CompositeAlphaMode,
+    CurrentSurfaceTexture, Device, DeviceDescriptor, Dx12BackendOptions, Dx12SwapchainKind,
+    ExperimentalFeatures, Features, Instance, InstanceDescriptor, Limits, LoadOp, Operations,
+    PowerPreference, Queue, RenderPassColorAttachment, RenderPassDescriptor, RequestAdapterOptions,
+    StoreOp, Surface, SurfaceConfiguration, TextureUsages, TextureView, TextureViewDescriptor,
+    Trace,
 };
 use winit::{event::WindowEvent, window::Window};
 
@@ -36,11 +37,23 @@ impl State {
     pub async fn init(window: Arc<Window>) -> Result<Self> {
         let size = window.inner_size();
 
+        let backends = if cfg!(target_os = "windows") {
+            Backends::DX12
+        } else {
+            Backends::PRIMARY
+        };
+
         let instance = Instance::new(InstanceDescriptor {
-            backends: Backends::PRIMARY,
+            backends,
             flags: Default::default(),
             memory_budget_thresholds: Default::default(),
-            backend_options: Default::default(),
+            backend_options: BackendOptions {
+                dx12: Dx12BackendOptions {
+                    presentation_system: Dx12SwapchainKind::DxgiFromVisual,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
             display: Default::default(),
         });
 
@@ -74,13 +87,29 @@ impl State {
             .copied()
             .unwrap_or(surface_caps.formats[0]);
 
+        let alpha_mode = [
+            CompositeAlphaMode::PreMultiplied,
+            CompositeAlphaMode::PostMultiplied,
+            CompositeAlphaMode::Inherit,
+        ]
+        .into_iter()
+        .find(|mode| surface_caps.alpha_modes.contains(mode))
+        .unwrap_or(surface_caps.alpha_modes[0]);
+
+        if matches!(alpha_mode, CompositeAlphaMode::Opaque) {
+            log::warn!(
+                "Surface transparency is not supported by this adapter/configuration; alpha modes: {:?}",
+                surface_caps.alpha_modes
+            );
+        }
+
         let config = SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: size.width,
             height: size.height,
             present_mode: surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
+            alpha_mode,
             view_formats: Vec::new(),
             desired_maximum_frame_latency: 2,
         };

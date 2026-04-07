@@ -122,19 +122,13 @@ impl Ui {
     }
 
     fn compute_should_close(&mut self, output: &FullOutput) {
-        let viewports = &output.viewport_output;
-
-        if viewports.len() == 0 {
+        if output.viewport_output.values().any(|output| {
+            output
+                .commands
+                .iter()
+                .any(|command| matches!(command, ViewportCommand::Close))
+        }) {
             self.should_close = true;
-        } else if viewports.len() == 1 {
-            let (_, output) = viewports.first_key_value().unwrap();
-
-            for command in &output.commands {
-                if command == &ViewportCommand::Close {
-                    self.should_close = true;
-                    break;
-                }
-            }
         }
     }
 
@@ -142,21 +136,3 @@ impl Ui {
         self.should_close
     }
 }
-
-// impl eframe::App for App {
-//     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-//         let window = egui::Window::new("Feline");
-
-//         let response = window.show(ctx, |ui| {
-//             ui.label("Hello, world!");
-
-//             if ui.button("Quit").clicked() {
-//                 ctx.send_viewport_cmd(ViewportCommand::Close);
-//             }
-//         });
-
-//         // let contains_pointer = response
-//         //     .map(|r| r.response.contains_pointer())
-//         //     .unwrap_or(false);
-//     }
-// }
