@@ -17,3 +17,7 @@ pub mod gpu {
         a: 0.0,
     };
 }
+
+pub mod window {
+    pub const DECORATIONS: bool = false;
+}

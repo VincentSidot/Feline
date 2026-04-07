@@ -58,7 +58,7 @@ impl ApplicationHandler for WinitApplication {
         let attr = WindowAttributes::default()
             .with_title(APP_NAME)
             .with_transparent(true)
-            .with_decorations(true)
+            .with_decorations(constants::window::DECORATIONS)
             .with_resizable(false)
             .with_window_level(WindowLevel::AlwaysOnTop);
 

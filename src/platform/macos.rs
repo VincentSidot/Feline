@@ -8,6 +8,8 @@ use winit::{
     window::Window,
 };
 
+use super::window_content_position;
+
 const NS_WINDOW_COLLECTION_BEHAVIOR_CAN_JOIN_ALL_SPACES: usize = 1 << 0;
 const NS_WINDOW_COLLECTION_BEHAVIOR_STATIONARY: usize = 1 << 4;
 const NS_WINDOW_COLLECTION_BEHAVIOR_FULLSCREEN_AUXILIARY: usize = 1 << 8;
@@ -72,10 +74,7 @@ pub fn configure_overlay_window(window: &Window) {
 
 pub fn cursor_position_in_window(window: &Window) -> Option<Pos2> {
     let cursor_position = cursor_position()?;
-    let window_position = window
-        .inner_position()
-        .ok()?
-        .to_logical::<f64>(window.scale_factor());
+    let window_position = window_content_position(window)?;
 
     Some(Pos2::new(
         (cursor_position.x - window_position.x) as f32,
