@@ -156,9 +156,8 @@ impl State {
                 self.surface.configure(&self.device, &self.config);
                 surface_texture
             }
-            CurrentSurfaceTexture::Timeout
-            | CurrentSurfaceTexture::Occluded
-            | CurrentSurfaceTexture::Validation => {
+            CurrentSurfaceTexture::Occluded => return Ok(()),
+            CurrentSurfaceTexture::Timeout | CurrentSurfaceTexture::Validation => {
                 // Skip the frame
                 log::trace!(
                     "Surface is not ready for rendering: {:?}",

@@ -11,7 +11,7 @@ use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
-    window::{Fullscreen, WindowAttributes, WindowId},
+    window::{WindowAttributes, WindowId},
 };
 
 /* Local */
@@ -56,10 +56,23 @@ impl ApplicationHandler for WinitApplication {
         let attr = WindowAttributes::default()
             .with_title(APP_NAME)
             .with_transparent(true)
-            .with_decorations(false)
-            .with_fullscreen(Some(Fullscreen::Borderless(None)));
+            .with_decorations(true)
+            .with_resizable(false);
 
         let window = Arc::new(_try!(self, event_loop.create_window(attr)));
+
+        let monitor = _try!(
+            self,
+            window
+                .current_monitor()
+                .ok_or_else(|| anyhow::anyhow!("Failed to get current monitor for window"))
+        );
+
+        window.set_outer_position(monitor.position());
+        if window.request_inner_size(monitor.size()).is_some() {
+            self.error = Some(anyhow::anyhow!("Failed to set window size"));
+            return;
+        }
 
         let runner = _try!(self, tokio::runtime::Runtime::new());
 
