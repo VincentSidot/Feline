@@ -135,4 +135,8 @@ impl Ui {
     pub fn should_close(&self) -> bool {
         self.should_close
     }
+
+    pub fn is_using_pointer(&self) -> bool {
+        self.context.egui_is_using_pointer()
+    }
 }

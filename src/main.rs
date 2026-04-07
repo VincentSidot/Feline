@@ -1,5 +1,6 @@
 /* Models */
 mod constants;
+mod platform;
 mod state;
 mod ui;
 mod utils;
@@ -11,7 +12,7 @@ use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
-    window::{WindowAttributes, WindowId},
+    window::{WindowAttributes, WindowId, WindowLevel},
 };
 
 /* Local */
@@ -57,7 +58,8 @@ impl ApplicationHandler for WinitApplication {
             .with_title(APP_NAME)
             .with_transparent(true)
             .with_decorations(true)
-            .with_resizable(false);
+            .with_resizable(false)
+            .with_window_level(WindowLevel::AlwaysOnTop);
 
         let window = Arc::new(_try!(self, event_loop.create_window(attr)));
 
@@ -133,6 +135,13 @@ impl ApplicationHandler for WinitApplication {
             }
 
             _ => (),
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if let Some(state) = &mut self.state {
+            state.update();
+            state.window().request_redraw();
         }
     }
 }

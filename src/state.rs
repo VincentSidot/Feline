@@ -14,7 +14,9 @@ use wgpu::{
 use winit::{event::WindowEvent, window::Window};
 
 /* Locals */
-use crate::{constants, ui::Ui};
+use crate::{constants, platform, ui::Ui};
+
+const HITTEST_MARGIN: f32 = 2.0;
 
 pub struct State {
     // WGPU Core Components
@@ -31,6 +33,9 @@ pub struct State {
 
     // State Flags
     is_surface_configured: bool,
+    cursor_hittest_enabled: bool,
+    cursor_hittest_available: bool,
+    egui_interactive_rect: Option<egui::Rect>,
 }
 
 impl State {
@@ -132,6 +137,9 @@ impl State {
             is_surface_configured: false,
             window,
             ui: Some(ui),
+            cursor_hittest_enabled: true,
+            cursor_hittest_available: true,
+            egui_interactive_rect: None,
         })
     }
 
@@ -200,6 +208,8 @@ impl State {
                 pixels_per_point: ui.context.pixels_per_point(),
             };
 
+            let mut egui_interactive_rect = None;
+
             ui.draw(
                 &self.device,
                 &self.queue,
@@ -210,18 +220,22 @@ impl State {
                 |ui| {
                     let ctx = ui.ctx();
 
-                    egui::Window::new("Test").show(ctx, |ui| {
-                        ui.label("Hello, EGUI!");
-                        if ui.button("Click me").clicked() {
-                            log::info!("Button clicked!");
-                        }
-                        if ui.button("Quit").clicked() {
-                            log::info!("Quit button clicked, exiting...");
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                        }
-                    });
+                    egui_interactive_rect = egui::Window::new("Test")
+                        .show(ctx, |ui| {
+                            ui.label("Hello, EGUI!");
+                            if ui.button("Click me").clicked() {
+                                log::info!("Button clicked!");
+                            }
+                            if ui.button("Quit").clicked() {
+                                log::info!("Quit button clicked, exiting...");
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            }
+                        })
+                        .map(|response| response.response.rect);
                 },
             );
+
+            self.egui_interactive_rect = egui_interactive_rect;
         }
     }
 
@@ -261,11 +275,55 @@ impl State {
     }
 
     pub fn update(&mut self) {
-        // Update code goes here
-        _ = self;
+        self.update_cursor_hittest();
     }
 
     pub fn window(&self) -> &Window {
         self.window.as_ref()
+    }
+
+    fn update_cursor_hittest(&mut self) {
+        if !self.cursor_hittest_available {
+            return;
+        }
+
+        if self.ui_is_using_pointer() {
+            self.set_cursor_hittest(true);
+            return;
+        }
+
+        let Some(rect) = self.egui_interactive_rect else {
+            self.set_cursor_hittest(true);
+            return;
+        };
+
+        let Some(cursor_position) = platform::cursor_position_in_window(&self.window) else {
+            return;
+        };
+
+        self.set_cursor_hittest(rect.expand(HITTEST_MARGIN).contains(cursor_position));
+    }
+
+    fn ui_is_using_pointer(&self) -> bool {
+        self.ui
+            .as_ref()
+            .map(|ui| ui.is_using_pointer())
+            .unwrap_or(false)
+    }
+
+    fn set_cursor_hittest(&mut self, enabled: bool) {
+        if self.cursor_hittest_enabled == enabled {
+            return;
+        }
+
+        match self.window.set_cursor_hittest(enabled) {
+            Ok(()) => {
+                self.cursor_hittest_enabled = enabled;
+            }
+            Err(err) => {
+                self.cursor_hittest_available = false;
+                log::warn!("Cursor hit testing is unavailable: {err}");
+            }
+        }
     }
 }
