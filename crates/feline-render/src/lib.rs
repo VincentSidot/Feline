@@ -5,6 +5,6 @@ mod state;
 mod ui;
 mod window;
 
-pub use app::{App, ApplicationId, ApplicationRenderRet};
+pub use app::{AppExt, ApplicationId, ApplicationRenderRet};
 pub use egui;
 pub use window::WinitApplication;

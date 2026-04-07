@@ -5,7 +5,7 @@ use egui::{Context, Response};
 pub type ApplicationId = u64;
 pub type ApplicationRenderRet = Option<Response>;
 
-pub trait App {
+pub trait AppExt {
     /// Called when the application should update its state.
     fn render(&mut self, ctx: &Context) -> ApplicationRenderRet;
 

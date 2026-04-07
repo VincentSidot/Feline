@@ -7,7 +7,7 @@ use winit::{
     window::{WindowAttributes, WindowId, WindowLevel},
 };
 
-use crate::{app::App, constants, platform::OverlayWindowPlatformExt, state::State};
+use crate::{app::AppExt, constants, platform::OverlayWindowPlatformExt, state::State};
 
 const APP_NAME: &str = "Feline";
 
@@ -15,7 +15,7 @@ const APP_NAME: &str = "Feline";
 pub struct WinitApplication {
     state: Option<State>,
     error: Option<Error>,
-    apps: Vec<Box<dyn App>>,
+    apps: Vec<Box<dyn AppExt>>,
 }
 
 impl WinitApplication {
@@ -42,11 +42,11 @@ impl WinitApplication {
         Ok(())
     }
 
-    pub fn register<A: App + 'static>(&mut self, app: A) {
+    pub fn register<A: AppExt + 'static>(&mut self, app: A) {
         self.apps.push(Box::new(app));
     }
 
-    pub fn register_default<A: App + Default + 'static>(&mut self) {
+    pub fn register_default<A: AppExt + Default + 'static>(&mut self) {
         let app = A::default();
         self.register(app);
     }

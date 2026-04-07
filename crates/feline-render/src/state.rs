@@ -16,7 +16,7 @@ use winit::{event::WindowEvent, window::Window};
 
 /* Locals */
 use crate::{
-    app::{App, ApplicationId},
+    app::{AppExt, ApplicationId},
     constants,
     platform::OverlayWindowPlatformExt,
     ui::Ui,
@@ -153,7 +153,7 @@ impl State {
         })
     }
 
-    pub fn register(&mut self, app: Box<dyn App>) -> Result<ApplicationId> {
+    pub fn register(&mut self, app: Box<dyn AppExt>) -> Result<ApplicationId> {
         self.bank.register(app)
     }
 
@@ -317,7 +317,7 @@ impl State {
 
 struct ApplicationEntry {
     id: ApplicationId,
-    opaque: Box<dyn App>,
+    opaque: Box<dyn AppExt>,
 }
 
 #[derive(Default)]
@@ -367,7 +367,7 @@ impl ApplicationBank {
         self.entries.len() as ApplicationId
     }
 
-    fn register(&mut self, mut app: Box<dyn App>) -> Result<ApplicationId> {
+    fn register(&mut self, mut app: Box<dyn AppExt>) -> Result<ApplicationId> {
         app.init()?;
         let id = self.fetch_id();
 

@@ -687,6 +687,7 @@ dependencies = [
  "colored",
  "dotenvy",
  "feline-render",
+ "feline-ui",
  "log",
 ]
 
@@ -703,6 +704,16 @@ dependencies = [
  "wgpu",
  "windows-sys 0.61.2",
  "winit",
+]
+
+[[package]]
+name = "feline-ui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "egui",
+ "feline-render",
+ "log",
 ]
 
 [[package]]
