@@ -1,8 +1,9 @@
 /* Libs */
-use anyhow::Result;
+use anyhow::{Result, bail};
+use egui::{Rect, Ui as EguiUi};
 use egui_wgpu::ScreenDescriptor;
 use egui_winit::EventResponse;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use wgpu::{
     BackendOptions, Backends, CommandEncoder, CommandEncoderDescriptor, CompositeAlphaMode,
     CurrentSurfaceTexture, Device, DeviceDescriptor, Dx12BackendOptions, Dx12SwapchainKind,
@@ -14,7 +15,12 @@ use wgpu::{
 use winit::{event::WindowEvent, window::Window};
 
 /* Locals */
-use crate::{constants, platform::OverlayWindowPlatformExt, ui::Ui};
+use crate::{
+    app::{App, ApplicationId},
+    constants,
+    platform::OverlayWindowPlatformExt,
+    ui::Ui,
+};
 
 const HITTEST_MARGIN: f32 = 2.0;
 
@@ -28,14 +34,17 @@ pub struct State {
     // Winit Window
     window: Arc<Window>,
 
-    // Optional EGUI State
-    ui: Option<Ui>,
+    // EGUI Render State
+    ui: Ui,
+
+    // Applications bank
+    bank: ApplicationBank,
 
     // State Flags
     is_surface_configured: bool,
     cursor_hittest_enabled: bool,
     cursor_hittest_available: bool,
-    egui_interactive_rect: Option<egui::Rect>,
+    egui_interactive_rect: Vec<Option<Rect>>,
 }
 
 impl State {
@@ -136,19 +145,20 @@ impl State {
             config,
             is_surface_configured: false,
             window,
-            ui: Some(ui),
+            ui,
             cursor_hittest_enabled: true,
             cursor_hittest_available: true,
-            egui_interactive_rect: None,
+            egui_interactive_rect: Default::default(),
+            bank: Default::default(),
         })
     }
 
+    pub fn register(&mut self, app: Box<dyn App>) -> Result<ApplicationId> {
+        self.bank.register(app)
+    }
+
     pub fn handle_egui_event(&mut self, event: &WindowEvent) -> EventResponse {
-        if let Some(ui) = &mut self.ui {
-            ui.handle_event(&self.window, event)
-        } else {
-            EventResponse::default()
-        }
+        self.ui.handle_event(&self.window, event)
     }
 
     pub fn render(&mut self) -> Result<()> {
@@ -202,41 +212,22 @@ impl State {
     }
 
     fn render_egui(&mut self, encoder: &mut CommandEncoder, view: &TextureView) {
-        if let Some(ui) = &mut self.ui {
-            let screen_descriptor = ScreenDescriptor {
-                size_in_pixels: [self.config.width, self.config.height],
-                pixels_per_point: ui.context.pixels_per_point(),
-            };
+        let screen_descriptor = ScreenDescriptor {
+            size_in_pixels: [self.config.width, self.config.height],
+            pixels_per_point: self.ui.context.pixels_per_point(),
+        };
 
-            let mut egui_interactive_rect = None;
-
-            ui.draw(
-                &self.device,
-                &self.queue,
-                encoder,
-                &self.window,
-                view,
-                &screen_descriptor,
-                |ui| {
-                    let ctx = ui.ctx();
-
-                    egui_interactive_rect = egui::Window::new("Test")
-                        .show(ctx, |ui| {
-                            ui.label("Hello, EGUI!");
-                            if ui.button("Click me").clicked() {
-                                log::info!("Button clicked!");
-                            }
-                            if ui.button("Quit").clicked() {
-                                log::info!("Quit button clicked, exiting...");
-                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                            }
-                        })
-                        .map(|response| response.response.rect);
-                },
-            );
-
-            self.egui_interactive_rect = egui_interactive_rect;
-        }
+        self.ui.draw(
+            &self.device,
+            &self.queue,
+            encoder,
+            &self.window,
+            view,
+            &screen_descriptor,
+            |ui| {
+                self.bank.render(ui, &mut self.egui_interactive_rect);
+            },
+        );
     }
 
     fn render_background(&self, encoder: &mut CommandEncoder, window_surface_view: &TextureView) {
@@ -268,14 +259,12 @@ impl State {
     }
 
     pub fn should_close(&self) -> bool {
-        self.ui
-            .as_ref()
-            .map(|ui| ui.should_close())
-            .unwrap_or(false)
+        self.ui.should_close()
     }
 
     pub fn update(&mut self) {
         self.update_cursor_hittest();
+        self.bank.garbage_collect();
     }
 
     pub fn window(&self) -> &Window {
@@ -292,23 +281,21 @@ impl State {
             return;
         }
 
-        let Some(rect) = self.egui_interactive_rect else {
-            self.set_cursor_hittest(true);
-            return;
-        };
-
         let Some(cursor_position) = self.window.cursor_position_in_window() else {
             return;
         };
 
-        self.set_cursor_hittest(rect.expand(HITTEST_MARGIN).contains(cursor_position));
+        let hit = self
+            .egui_interactive_rect
+            .iter()
+            .flatten()
+            .any(|rect| rect.expand(HITTEST_MARGIN).contains(cursor_position));
+
+        self.set_cursor_hittest(hit);
     }
 
     fn ui_is_using_pointer(&self) -> bool {
-        self.ui
-            .as_ref()
-            .map(|ui| ui.is_using_pointer())
-            .unwrap_or(false)
+        self.ui.is_using_pointer()
     }
 
     fn set_cursor_hittest(&mut self, enabled: bool) {
@@ -325,5 +312,91 @@ impl State {
                 log::warn!("Cursor hit testing is unavailable: {err}");
             }
         }
+    }
+}
+
+struct ApplicationEntry {
+    id: ApplicationId,
+    opaque: Box<dyn App>,
+}
+
+#[derive(Default)]
+struct ApplicationBank {
+    entries: Vec<ApplicationEntry>,
+    index_by_id: HashMap<ApplicationId, usize>,
+    free_ids: Vec<ApplicationId>,
+    to_free_ids: Vec<ApplicationId>,
+}
+
+impl ApplicationBank {
+    fn render(&mut self, ui: &mut EguiUi, rects: &mut Vec<Option<Rect>>) {
+        let ctx = ui.ctx();
+
+        // Ensure rect has capacity for all apps
+        rects.resize(self.entries.len(), None);
+
+        for (id, entry) in &mut self.entries.iter_mut().enumerate() {
+            let response = entry.opaque.render(ctx);
+
+            rects[id] = response.map(|response| response.rect);
+
+            if entry.opaque.should_close() {
+                self.to_free_ids.push(entry.id);
+            }
+        }
+    }
+
+    fn garbage_collect(&mut self) {
+        let ids = std::mem::take(&mut self.to_free_ids);
+
+        for id in ids {
+            if let Err(err) = self.unregister(id) {
+                // TODO [MEDIUM]: Handle errors better and propagate them up.
+                log::error!("Failed to unregister app with id {id}: {err}");
+            }
+        }
+    }
+
+    fn fetch_id(&mut self) -> ApplicationId {
+        if let Some(id) = self.free_ids.pop() {
+            return id;
+        }
+
+        // Else if no free ids, it means there is no hole in app vecs, so we can
+        // just use the next id which is the current length of the apps vec
+        self.entries.len() as ApplicationId
+    }
+
+    fn register(&mut self, mut app: Box<dyn App>) -> Result<ApplicationId> {
+        app.init()?;
+        let id = self.fetch_id();
+
+        let entry = ApplicationEntry { id, opaque: app };
+
+        self.index_by_id.insert(id, self.entries.len());
+        self.entries.push(entry);
+
+        Ok(id)
+    }
+
+    fn unregister(&mut self, id: ApplicationId) -> Result<()> {
+        let Some(index) = self.index_by_id.remove(&id) else {
+            bail!("No application with id {id}");
+        };
+
+        let index_to_fix = self.entries.len() - 1;
+        let mut app = self.entries.swap_remove(index);
+
+        // Post fix the app if we didn't just remove the last one
+        if index != index_to_fix {
+            let moved_app_id = self.entries[index].id;
+            self.index_by_id.insert(moved_app_id, index);
+        }
+
+        self.free_ids.push(id);
+
+        app.opaque.deinit()?;
+
+        Ok(())
     }
 }
