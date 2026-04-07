@@ -16,6 +16,7 @@ use winit::{
 };
 
 /* Local */
+use crate::platform::OverlayWindowPlatformExt;
 use crate::state::State;
 
 const APP_NAME: &str = "Feline";
@@ -62,6 +63,7 @@ impl ApplicationHandler for WinitApplication {
             .with_window_level(WindowLevel::AlwaysOnTop);
 
         let window = Arc::new(_try!(self, event_loop.create_window(attr)));
+        window.configure_overlay_window();
 
         let monitor = _try!(
             self,

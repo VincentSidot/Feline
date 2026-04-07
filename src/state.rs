@@ -14,7 +14,7 @@ use wgpu::{
 use winit::{event::WindowEvent, window::Window};
 
 /* Locals */
-use crate::{constants, platform, ui::Ui};
+use crate::{constants, platform::OverlayWindowPlatformExt, ui::Ui};
 
 const HITTEST_MARGIN: f32 = 2.0;
 
@@ -297,7 +297,7 @@ impl State {
             return;
         };
 
-        let Some(cursor_position) = platform::cursor_position_in_window(&self.window) else {
+        let Some(cursor_position) = self.window.cursor_position_in_window() else {
             return;
         };
 
