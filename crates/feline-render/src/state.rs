@@ -38,7 +38,7 @@ pub struct State {
     ui: Ui,
 
     // Applications bank
-    bank: ApplicationBank,
+    app_bank: ApplicationBank,
 
     // State Flags
     is_surface_configured: bool,
@@ -149,12 +149,12 @@ impl State {
             cursor_hittest_enabled: true,
             cursor_hittest_available: true,
             egui_interactive_rect: Default::default(),
-            bank: Default::default(),
+            app_bank: Default::default(),
         })
     }
 
     pub fn register(&mut self, app: Box<dyn AppExt>) -> Result<ApplicationId> {
-        self.bank.register(app)
+        self.app_bank.register(app)
     }
 
     pub fn handle_egui_event(&mut self, event: &WindowEvent) -> EventResponse {
@@ -225,7 +225,7 @@ impl State {
             view,
             &screen_descriptor,
             |ui| {
-                self.bank.render(ui, &mut self.egui_interactive_rect);
+                self.app_bank.render(ui, &mut self.egui_interactive_rect);
             },
         );
     }
@@ -259,12 +259,12 @@ impl State {
     }
 
     pub fn should_close(&self) -> bool {
-        self.ui.should_close()
+        self.ui.should_close() || self.app_bank.empty()
     }
 
     pub fn update(&mut self) {
         self.update_cursor_hittest();
-        self.bank.garbage_collect();
+        self.app_bank.garbage_collect();
     }
 
     pub fn window(&self) -> &Window {
@@ -398,5 +398,9 @@ impl ApplicationBank {
         app.opaque.deinit()?;
 
         Ok(())
+    }
+
+    fn empty(&self) -> bool {
+        self.entries.is_empty()
     }
 }
