@@ -1,9 +1,12 @@
-[package]
-name = "feline"
+[workspace]
+members = ["crates/feline", "crates/feline-render"]
+resolver = "3"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.102"
 colored = "3.1.1"
 dotenvy = "0.15.7"
@@ -14,6 +17,3 @@ log = "0.4.29"
 tokio = { version = "1.51.0", features = ["full"] }
 wgpu = "29.0.1"
 winit = "0.30.13"
-
-[target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }

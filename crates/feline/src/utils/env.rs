@@ -1,7 +1,7 @@
 use log::Level;
 use std::{env, sync::OnceLock};
 
-use crate::utils::logger::logfmt;
+use super::logger::logfmt;
 
 pub fn load_env() {
     static LOAD_ONCE: OnceLock<()> = OnceLock::new();

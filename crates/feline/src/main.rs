@@ -1,25 +1,14 @@
-/* Models */
-mod app;
-mod constants;
-mod platform;
-mod state;
-mod ui;
 mod utils;
-mod window;
 
 /* Libs */
 use anyhow::Result;
-
-/* Locals */
-use window::WinitApplication;
-
-use crate::app::App;
+use feline_render::{App, ApplicationRenderRet, WinitApplication, egui};
 
 #[derive(Default)]
 struct MyApp {}
 
 impl App for MyApp {
-    fn render(&mut self, ctx: &egui::Context) -> app::ApplicationRenderRet {
+    fn render(&mut self, ctx: &egui::Context) -> ApplicationRenderRet {
         egui::Window::new("Test")
             .show(ctx, |ui| {
                 ui.label("Hello, EGUI!");

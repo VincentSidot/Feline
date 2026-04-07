@@ -686,6 +686,15 @@ dependencies = [
  "anyhow",
  "colored",
  "dotenvy",
+ "feline-render",
+ "log",
+]
+
+[[package]]
+name = "feline-render"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
  "egui",
  "egui-wgpu",
  "egui-winit",
